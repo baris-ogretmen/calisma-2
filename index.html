@@ -1,0 +1,333 @@
+import React, { useState, useEffect } from 'react';
+import { Star, Car, Apple, Sun, Cat, Home, ArrowRight, Play, RefreshCw, Trophy, Volume2, HelpCircle } from 'lucide-react';
+
+const BarisLearningApp = () => {
+  const [gameState, setGameState] = useState('welcome');
+  const [currentLevel, setCurrentLevel] = useState(0);
+  const [gamePhase, setGamePhase] = useState('learn'); // 'learn' (tanıma) veya 'match' (eşleştirme)
+  const [showInteraction, setShowInteraction] = useState(false);
+  const [animate, setAnimate] = useState(false);
+  const [matchOptions, setMatchOptions] = useState([]);
+  const [wrongShake, setWrongShake] = useState(null); // Yanlış cevap titremesi
+
+  // Seslendirme Fonksiyonu
+  const speak = (text) => {
+    if ('speechSynthesis' in window) {
+      // Önceki konuşmayı durdur
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'tr-TR';
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const levels = [
+    {
+      id: 1,
+      icon: <Car size={140} className="text-blue-500 drop-shadow-xl" />,
+      smallIcon: <Car size={80} className="text-blue-500" />,
+      name: 'Araba',
+      sound: 'Düt düt',
+      color: 'Mavi',
+      questions: ["Bu ne?", "Rengi ne?", "Ne yapar?"],
+      bgColor: 'bg-blue-50'
+    },
+    {
+      id: 2,
+      icon: <Apple size={140} className="text-red-500 drop-shadow-xl" />,
+      smallIcon: <Apple size={80} className="text-red-500" />,
+      name: 'Elma',
+      sound: 'Ham ham',
+      color: 'Kırmızı',
+      questions: ["Adı ne?", "Rengi ne?", "Yenir mi?"],
+      bgColor: 'bg-red-50'
+    },
+    {
+      id: 3,
+      icon: <Sun size={140} className="text-yellow-500 drop-shadow-xl" />,
+      smallIcon: <Sun size={80} className="text-yellow-500" />,
+      name: 'Güneş',
+      sound: 'Sıcak',
+      color: 'Sarı',
+      questions: ["Bu ne?", "Bizi ısıtır mı?", "Rengi ne?"],
+      bgColor: 'bg-yellow-50'
+    },
+    {
+      id: 4,
+      icon: <Cat size={140} className="text-orange-500 drop-shadow-xl" />,
+      smallIcon: <Cat size={80} className="text-orange-500" />,
+      name: 'Kedi',
+      sound: 'Miyav',
+      color: 'Turuncu',
+      questions: ["Hangi hayvan?", "Ne der?", "Kulakları nerede?"],
+      bgColor: 'bg-orange-50'
+    },
+    {
+      id: 5,
+      icon: <Home size={140} className="text-purple-500 drop-shadow-xl" />,
+      smallIcon: <Home size={80} className="text-purple-500" />,
+      name: 'Ev',
+      sound: 'Tık tık',
+      color: 'Mor',
+      questions: ["Burası neresi?", "Kim yaşar?", "Kapısı nerede?"],
+      bgColor: 'bg-purple-50'
+    }
+  ];
+
+  // Eşleştirme seçeneklerini hazırla (1 doğru + 2 yanlış)
+  const prepareMatchOptions = (levelIndex) => {
+    const currentItem = levels[levelIndex];
+    // Mevcut item dışındakileri al
+    const otherItems = levels.filter(l => l.id !== currentItem.id);
+    // Karıştır ve 2 tane seç
+    const distractors = otherItems.sort(() => 0.5 - Math.random()).slice(0, 2);
+    // Doğru ve yanlışları birleştirip tekrar karıştır
+    const options = [currentItem, ...distractors].sort(() => 0.5 - Math.random());
+    setMatchOptions(options);
+  };
+
+  const handleStart = () => {
+    setGameState('game');
+    setCurrentLevel(0);
+    setGamePhase('learn');
+    setShowInteraction(false);
+    speak("Merhaba. Hadi başlayalım.");
+  };
+
+  // TANIMA FAZI: Nesneye tıklama
+  const handleObjectClick = () => {
+    if (!showInteraction) {
+      setAnimate(true);
+      speak(levels[currentLevel].name);
+      
+      setTimeout(() => {
+        setAnimate(false);
+        setShowInteraction(true);
+      }, 800);
+    } else {
+      setAnimate(true);
+      speak(levels[currentLevel].name);
+      setTimeout(() => setAnimate(false), 500);
+    }
+  };
+
+  // TANIMA -> EŞLEŞTİRME Geçişi
+  const goToMatchPhase = () => {
+    prepareMatchOptions(currentLevel);
+    setGamePhase('match');
+    speak("Şimdi aynısını bul.");
+  };
+
+  // EŞLEŞTİRME FAZI: Seçenek tıklama
+  const handleMatchSelect = (selectedItem) => {
+    const correctItem = levels[currentLevel];
+    
+    if (selectedItem.id === correctItem.id) {
+      // DOĞRU
+      speak("Aferin! Aynısını buldun.");
+      // Konfeti efekti veya kısa bir bekleme sonrası sonraki seviye
+      setTimeout(() => {
+        handleNextLevel();
+      }, 1500);
+    } else {
+      // YANLIŞ
+      speak("Hayır, tekrar dene.");
+      setWrongShake(selectedItem.id);
+      setTimeout(() => setWrongShake(null), 500);
+    }
+  };
+
+  // SONRAKİ SEVİYE
+  const handleNextLevel = () => {
+    if (currentLevel < levels.length - 1) {
+      setCurrentLevel(curr => curr + 1);
+      setGamePhase('learn');
+      setShowInteraction(false);
+    } else {
+      setGameState('celebration');
+      speak("Harikasın! Oyun bitti.");
+    }
+  };
+
+  const Confetti = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-50">
+      {[...Array(25)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute animate-bounce"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animationDuration: `${1.5 + Math.random()}s`,
+            fontSize: '24px'
+          }}
+        >
+          {['🎈', '✨', '🌟', '🎉'][Math.floor(Math.random() * 4)]}
+        </div>
+      ))}
+    </div>
+  );
+
+  // --- EKRANLAR ---
+
+  if (gameState === 'welcome') {
+    return (
+      <div className="min-h-screen bg-blue-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-[3rem] shadow-xl text-center max-w-sm w-full border-4 border-blue-200">
+          <Star size={80} className="text-yellow-400 mx-auto mb-6 animate-pulse" />
+          <h1 className="text-3xl font-black text-blue-500 mb-8">HOŞ GELDİN</h1>
+          <button
+            onClick={handleStart}
+            className="w-full bg-green-500 active:bg-green-600 text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center"
+          >
+            <Play size={48} fill="white" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (gameState === 'celebration') {
+    return (
+      <div className="min-h-screen bg-yellow-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <Confetti />
+        <div className="bg-white p-8 rounded-[3rem] shadow-xl text-center max-w-sm w-full border-4 border-yellow-300 z-10">
+          <Trophy size={100} className="text-yellow-500 mx-auto mb-6 animate-bounce" />
+          <h1 className="text-3xl font-black text-gray-700 mb-8">SÜPERSİN!</h1>
+          <button
+            onClick={handleStart}
+            className="w-full bg-blue-500 active:bg-blue-600 text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center"
+          >
+            <RefreshCw size={48} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentData = levels[currentLevel];
+
+  // --- OYUN ALANI ---
+  return (
+    <div className={`min-h-screen ${currentData.bgColor} flex flex-col items-center p-4 transition-colors duration-500`}>
+      
+      {/* İlerleme Çubuğu */}
+      <div className="w-full max-w-md h-3 bg-gray-200 rounded-full mt-4 mb-4 overflow-hidden">
+        <div 
+          className="h-full bg-green-500 transition-all duration-500"
+          style={{ width: `${((currentLevel) / levels.length) * 100}%` }}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md">
+        
+        {/* FAZ 1: TANIMA (ÖĞRENME) */}
+        {gamePhase === 'learn' && (
+          <>
+            <div className="relative group mb-8">
+                <button
+                onClick={handleObjectClick}
+                className={`
+                    bg-white p-12 rounded-[3rem] shadow-2xl border-4 border-white
+                    transform transition-all duration-300
+                    ${animate ? 'scale-110 rotate-3 ring-4 ring-green-300' : 'scale-100 hover:scale-105'}
+                `}
+                >
+                {currentData.icon}
+                
+                {!showInteraction && (
+                    <div className="absolute -bottom-4 -right-4 bg-yellow-400 text-white p-3 rounded-full animate-bounce shadow-lg">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <path d="M12 2a10 10 0 1 0 10 10" opacity="0.5"/>
+                        <path d="M12 12v6" />
+                        <path d="M12 18l-4-4" />
+                        <path d="M12 18l4-4" />
+                    </svg>
+                    </div>
+                )}
+                </button>
+            </div>
+
+            {showInteraction && (
+              <div className="w-full animate-fade-in-up flex flex-col items-center gap-6">
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => speak(currentData.name)}
+                        className="bg-white p-4 rounded-2xl shadow-md active:scale-95 border-b-4 border-gray-200"
+                    >
+                        <Volume2 size={32} className="text-blue-500" />
+                    </button>
+                    <button 
+                        onClick={() => speak(currentData.sound)}
+                        className="bg-white p-4 rounded-2xl shadow-md active:scale-95 border-b-4 border-gray-200"
+                    >
+                        <span className="text-2xl">🎵</span>
+                    </button>
+                </div>
+
+                {/* Eğitmen İpuçları */}
+                <div className="bg-white/50 p-3 rounded-xl w-full text-center">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Sor:</p>
+                    <div className="flex justify-center flex-wrap gap-2 text-sm font-medium text-gray-700">
+                        {currentData.questions.map((q, i) => (
+                            <span key={i} className="bg-white px-2 py-1 rounded-md shadow-sm border border-gray-100">{q}</span>
+                        ))}
+                    </div>
+                </div>
+
+                <button
+                  onClick={goToMatchPhase}
+                  className="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white w-20 h-20 rounded-full shadow-xl flex items-center justify-center transform transition-all active:scale-90 animate-pulse-slow mt-2"
+                >
+                  <ArrowRight size={40} strokeWidth={3} />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* FAZ 2: EŞLEŞTİRME (AYNISINI BUL) */}
+        {gamePhase === 'match' && (
+          <div className="w-full flex flex-col items-center animate-fade-in">
+            
+            {/* Hedef Nesne (Küçük Gösterim) */}
+            <div className="bg-white p-4 rounded-3xl shadow-lg mb-8 border-4 border-blue-200 relative">
+               <div className="absolute -top-4 -left-4 bg-blue-500 text-white p-2 rounded-full">
+                  <HelpCircle size={24} />
+               </div>
+               {currentData.smallIcon}
+            </div>
+
+            <h2 className="text-xl font-bold text-gray-500 mb-6 uppercase tracking-widest">Aynısını Bul</h2>
+
+            {/* Seçenekler */}
+            <div className="grid grid-cols-3 gap-4 w-full">
+              {matchOptions.map((option, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleMatchSelect(option)}
+                  className={`
+                    bg-white p-4 rounded-2xl shadow-md border-b-4 border-gray-200 
+                    flex items-center justify-center aspect-square
+                    transform transition-all active:scale-95
+                    ${wrongShake === option.id ? 'animate-shake bg-red-50 border-red-200' : ''}
+                  `}
+                >
+                  {/* Seçenekler için küçük icon kullanıyoruz ki ekrana sığsın */}
+                  {React.cloneElement(option.smallIcon, { size: 60 })} 
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+export default BarisLearningApp;
+
+
+
